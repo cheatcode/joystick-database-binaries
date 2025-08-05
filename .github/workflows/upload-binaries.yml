@@ -6,7 +6,10 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
+      max-parallel: 3
+      fail-fast: false
       matrix:
         include:
           # MongoDB
