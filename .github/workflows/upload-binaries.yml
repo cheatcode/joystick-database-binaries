@@ -170,11 +170,15 @@ jobs:
           fi
 
       - name: Upload to R2 with aws-cli
-        if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
           set -euo pipefail
           pip install awscli --break-system-packages
+
+          if [[ -z "${R2_ENDPOINT}" ]]; then
+            echo "R2_ENDPOINT is empty. Skipping upload."
+            exit 1
+          fi
 
           export AWS_ACCESS_KEY_ID="${{ env.R2_ACCESS_KEY_ID }}"
           export AWS_SECRET_ACCESS_KEY="${{ env.R2_SECRET_ACCESS_KEY }}"
@@ -184,4 +188,4 @@ jobs:
             ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/ \
             s3://${{ env.R2_BUCKET }}/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/ \
             --recursive \
-            --endpoint-url="${{ env.R2_ENDPOINT }}"
+            --endpoint-url "${{ env.R2_ENDPOINT }}"
