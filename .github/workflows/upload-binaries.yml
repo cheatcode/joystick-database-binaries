@@ -135,8 +135,8 @@ jobs:
                 curl -s -X GET "https://www.memurai.com/api/request-download-link?version=windows-redis" -o memurai.json
                 MEMURAI_URL=$(jq -r .url memurai.json)
                 curl -L -o memurai.msi "$MEMURAI_URL"
-                msiextract memurai.msi
-                cp -r "Memurai/bin"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                powershell Start-Process msiexec.exe -Wait -ArgumentList "/a memurai.msi /quiet TARGETDIR=$(pwd)\\memurai_extracted"
+                cp -r memurai_extracted/Memurai/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "$RUNNER_OS" == "macOS" ]]; then
                 brew install redis
                 cp $(brew --prefix redis)/bin/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
@@ -163,7 +163,8 @@ jobs:
             postgresql)
               if [[ "$RUNNER_OS" == "Windows" ]]; then
                 choco install postgresql --version=${DB_VERSION} -y
-                cp -r "C:/ProgramData/chocolatey/lib/postgresql/tools"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                POSTGRES_PATH="C:/Program Files/PostgreSQL/${DB_MAJOR_VERSION}/bin"
+                cp -r "${POSTGRES_PATH}"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "$RUNNER_OS" == "macOS" ]]; then
                 brew install postgresql@${DB_MAJOR_VERSION}
                 cp $(brew --prefix postgresql@${DB_MAJOR_VERSION})/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
