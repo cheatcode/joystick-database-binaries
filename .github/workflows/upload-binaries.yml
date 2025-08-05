@@ -38,7 +38,7 @@ jobs:
             arch: _x86_64
             ext: zip
 
-          # PostgreSQL (use 16 instead of 17)
+          # PostgreSQL
           - database: postgresql
             db_version: 16.0
             os: macos-latest
@@ -117,8 +117,8 @@ jobs:
         run: |
           echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
           echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
-          echo "DB_MAJOR_VERSION=${{ matrix.db_version }}" | cut -d. -f1 >> $GITHUB_ENV
-          echo "ARCH_CLEAN=${{ matrix.arch }}" | sed 's/^_//' >> $GITHUB_ENV
+          echo "DB_MAJOR_VERSION=$(echo '${{ matrix.db_version }}' | cut -d. -f1)" >> $GITHUB_ENV
+          echo "ARCH_CLEAN=$(echo '${{ matrix.arch }}' | sed 's/^_//')" >> $GITHUB_ENV
 
       - name: Set up architecture switching (x86_64 on macOS)
         if: matrix.arch == '_x86_64' && matrix.platform == 'macos'
@@ -132,9 +132,11 @@ jobs:
           case "$DATABASE" in
             redis)
               if [[ "$RUNNER_OS" == "Windows" ]]; then
-                curl -L -o memurai.zip https://github.com/tporadowski/redis/releases/download/v7.0.15/Redis-x64-7.0.15.1.zip
-                unzip memurai.zip -d ./temp
-                cp ./temp/*.exe ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                curl -s -X GET "https://www.memurai.com/api/request-download-link?version=windows-redis" -o memurai.json
+                MEMURAI_URL=$(jq -r .url memurai.json)
+                curl -L -o memurai.msi "$MEMURAI_URL"
+                msiextract memurai.msi
+                cp -r "Memurai/bin"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "$RUNNER_OS" == "macOS" ]]; then
                 brew install redis
                 cp $(brew --prefix redis)/bin/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
@@ -161,7 +163,7 @@ jobs:
             postgresql)
               if [[ "$RUNNER_OS" == "Windows" ]]; then
                 choco install postgresql --version=${DB_VERSION} -y
-                cp "C:/Program Files/PostgreSQL/${DB_MAJOR_VERSION}/bin/*" ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp -r "C:/ProgramData/chocolatey/lib/postgresql/tools"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "$RUNNER_OS" == "macOS" ]]; then
                 brew install postgresql@${DB_MAJOR_VERSION}
                 cp $(brew --prefix postgresql@${DB_MAJOR_VERSION})/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
