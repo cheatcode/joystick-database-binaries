@@ -1,58 +1,130 @@
-name: Build and Upload Database Binaries to R2
+name: Build and Upload DB Binaries to R2
 
 on:
   workflow_dispatch:
-    inputs:
-      db_version:
-        description: "Version of the database to fetch/build"
-        required: true
-      database:
-        description: "Database (mongodb, postgresql, redis, clickhouse)"
-        required: true
-        type: choice
-        options:
-          - mongodb
-          - postgresql
-          - redis
-          - clickhouse
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    if: >
-      !(github.event.inputs.database == 'clickhouse' && matrix.platform == 'windows')
     strategy:
       matrix:
         include:
-          - os: macos-latest
+          # MongoDB
+          - database: mongodb
+            db_version: 8.0.0
+            os: macos-latest
             platform: macos
             arch: arm64
             ext: tar.gz
-          - os: macos-latest
+          - database: mongodb
+            db_version: 8.0.0
+            os: macos-latest
             platform: macos
             arch: _x86_64
             ext: tar.gz
-          - os: ubuntu-latest
+          - database: mongodb
+            db_version: 8.0.0
+            os: ubuntu-latest
             platform: linux
             arch: _x86_64
             ext: tar.gz
-          - os: windows-latest
+          - database: mongodb
+            db_version: 8.0.0
+            os: windows-latest
             platform: windows
             arch: _x86_64
             ext: zip
 
+          # PostgreSQL
+          - database: postgresql
+            db_version: 17.0
+            os: macos-latest
+            platform: macos
+            arch: arm64
+            ext: tar.gz
+          - database: postgresql
+            db_version: 17.0
+            os: macos-latest
+            platform: macos
+            arch: _x86_64
+            ext: tar.gz
+          - database: postgresql
+            db_version: 17.0
+            os: ubuntu-latest
+            platform: linux
+            arch: _x86_64
+            ext: tar.gz
+          - database: postgresql
+            db_version: 17.0
+            os: windows-latest
+            platform: windows
+            arch: _x86_64
+            ext: zip
+
+          # Redis
+          - database: redis
+            db_version: 7.0.15
+            os: macos-latest
+            platform: macos
+            arch: arm64
+            ext: tar.gz
+          - database: redis
+            db_version: 7.0.15
+            os: macos-latest
+            platform: macos
+            arch: _x86_64
+            ext: tar.gz
+          - database: redis
+            db_version: 7.0.15
+            os: ubuntu-latest
+            platform: linux
+            arch: _x86_64
+            ext: tar.gz
+          - database: redis
+            db_version: 7.0.15
+            os: windows-latest
+            platform: windows
+            arch: _x86_64
+            ext: zip
+
+          # Clickhouse (no windows)
+          - database: clickhouse
+            db_version: 24.4.1.2280
+            os: macos-latest
+            platform: macos
+            arch: arm64
+            ext: tar.gz
+          - database: clickhouse
+            db_version: 24.4.1.2280
+            os: macos-latest
+            platform: macos
+            arch: _x86_64
+            ext: tar.gz
+          - database: clickhouse
+            db_version: 24.4.1.2280
+            os: ubuntu-latest
+            platform: linux
+            arch: _x86_64
+            ext: tar.gz
+
     env:
-      DB_VERSION: ${{ github.event.inputs.db_version }}
-      DB_MAJOR_VERSION: ${{ github.event.inputs.db_version }}
-      DATABASE: ${{ github.event.inputs.database }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
     steps:
-      - name: Extract major version
-        run: echo "DB_MAJOR_VERSION=${DB_VERSION%%.*}" >> $GITHUB_ENV
+      - name: Set environment variables
+        run: |
+          echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
+          echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
+          echo "DB_MAJOR_VERSION=${{ matrix.db_version%%.* }}" >> $GITHUB_ENV
+
+      - name: Skip unsupported combo (clickhouse + windows)
+        if: ${{ matrix.database == 'clickhouse' && matrix.platform == 'windows' }}
+        run: |
+          echo "Clickhouse is not supported on Windows. Skipping job."
+          exit 0
 
       - name: Set up architecture switching (x86_64 on macOS)
         if: matrix.arch == '_x86_64' && matrix.platform == 'macos'
@@ -63,55 +135,55 @@ jobs:
         run: |
           mkdir -p ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}
 
-          case "$DATABASE" in
+          case "${{ env.DATABASE }}" in
             redis)
               if [[ "${{ runner.os }}" == "Windows" ]]; then
                 curl -L -o memurai.zip https://github.com/tporadowski/redis/releases/download/v7.0.15/Redis-x64-7.0.15.1.zip
                 unzip memurai.zip -d ./temp
-                cp ./temp/*.exe ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp ./temp/*.exe ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "${{ runner.os }}" == "macOS" ]]; then
                 brew install redis
-                cp $(brew --prefix redis)/bin/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp $(brew --prefix redis)/bin/redis-server ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
                 sudo apt update && sudo apt install redis-server -y
-                cp $(which redis-server) ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp $(which redis-server) ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
             mongodb)
               if [[ "${{ runner.os }}" == "Windows" ]]; then
-                curl -LO https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-${DB_VERSION}.zip
-                unzip mongodb-windows-x86_64-${DB_VERSION}.zip -d ./temp
-                cp ./temp/mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                curl -LO https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-${{ env.DB_VERSION }}.zip
+                unzip mongodb-windows-x86_64-${{ env.DB_VERSION }}.zip -d ./temp
+                cp ./temp/mongodb-*/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "${{ runner.os }}" == "macOS" ]]; then
-                curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${matrix.arch#_}-${DB_VERSION}.tgz
-                tar -xzf mongodb-macos-*-${DB_VERSION}.tgz
-                cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${{ matrix.arch#_ }}-${{ env.DB_VERSION }}.tgz
+                tar -xzf mongodb-macos-*-${{ env.DB_VERSION }}.tgz
+                cp ./mongodb-*/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
-                curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
+                curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${{ env.DB_VERSION }}.tgz
                 tar -xzf mongodb-linux-*.tgz
-                cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp ./mongodb-*/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
             postgresql)
               if [[ "${{ runner.os }}" == "Windows" ]]; then
-                choco install postgresql --version=${DB_VERSION} -y
-                cp "C:/Program Files/PostgreSQL/${DB_VERSION}/bin/*" ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                choco install postgresql --version=${{ env.DB_VERSION }} -y
+                cp "C:/Program Files/PostgreSQL/${{ env.DB_VERSION }}/bin/*" ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "${{ runner.os }}" == "macOS" ]]; then
-                brew install postgresql@${DB_VERSION%%.*}
-                cp $(brew --prefix postgresql@${DB_VERSION%%.*})/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                brew install postgresql@${{ env.DB_MAJOR_VERSION }}
+                cp $(brew --prefix postgresql@${{ env.DB_MAJOR_VERSION }})/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
-                sudo apt update && sudo apt install postgresql-${DB_VERSION%%.*} -y
-                cp /usr/lib/postgresql/${DB_VERSION%%.*}/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                sudo apt update && sudo apt install postgresql-${{ env.DB_MAJOR_VERSION }} -y
+                cp /usr/lib/postgresql/${{ env.DB_MAJOR_VERSION }}/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
             clickhouse)
               if [[ "${{ runner.os }}" == "macOS" ]]; then
                 brew install clickhouse
-                cp $(brew --prefix clickhouse)/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp $(brew --prefix clickhouse)/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "${{ runner.os }}" == "Linux" ]]; then
                 curl -LO https://builds.clickhouse.com/master/x86_64/clickhouse
                 chmod +x clickhouse
-                mv clickhouse ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                mv clickhouse ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
           esac
