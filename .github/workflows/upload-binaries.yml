@@ -119,6 +119,7 @@ jobs:
           echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
           echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
           echo "DB_MAJOR_VERSION=$(echo '${{ matrix.db_version }}' | cut -d. -f1)" >> $GITHUB_ENV
+          echo "ARCH_CLEAN=$(echo '${{ matrix.arch }}' | sed 's/^_//')" >> $GITHUB_ENV
 
       - name: Skip unsupported combo (clickhouse + windows)
         if: ${{ matrix.database == 'clickhouse' && matrix.platform == 'windows' }}
@@ -128,75 +129,74 @@ jobs:
 
       - name: Set up architecture switching (x86_64 on macOS)
         if: matrix.arch == '_x86_64' && matrix.platform == 'macos'
-        run: |
-          echo "alias brew='arch -x86_64 /usr/local/bin/brew'" >> $GITHUB_ENV
+        run: echo "alias brew='arch -x86_64 /usr/local/bin/brew'" >> $GITHUB_ENV
 
       - name: Install dependencies and fetch binaries
+        shell: bash
         run: |
-          mkdir -p ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}
+          mkdir -p ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}
 
-          case "${{ env.DATABASE }}" in
+          case "$DATABASE" in
             redis)
-              if [[ "${{ runner.os }}" == "Windows" ]]; then
+              if [[ "$RUNNER_OS" == "Windows" ]]; then
                 curl -L -o memurai.zip https://github.com/tporadowski/redis/releases/download/v7.0.15/Redis-x64-7.0.15.1.zip
                 unzip memurai.zip -d ./temp
-                cp ./temp/*.exe ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
-              elif [[ "${{ runner.os }}" == "macOS" ]]; then
+                cp ./temp/*.exe ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+              elif [[ "$RUNNER_OS" == "macOS" ]]; then
                 brew install redis
-                cp $(brew --prefix redis)/bin/redis-server ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp $(brew --prefix redis)/bin/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
                 sudo apt update && sudo apt install redis-server -y
-                cp $(which redis-server) ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp $(which redis-server) ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
             mongodb)
-              if [[ "${{ runner.os }}" == "Windows" ]]; then
-                curl -LO https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-${{ env.DB_VERSION }}.zip
-                unzip mongodb-windows-x86_64-${{ env.DB_VERSION }}.zip -d ./temp
-                cp ./temp/mongodb-*/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
-              elif [[ "${{ runner.os }}" == "macOS" ]]; then
-                arch_value=$(echo "${{ matrix.arch }}" | sed 's/^_//')
-                curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${arch_value}-${{ env.DB_VERSION }}.tgz
-                tar -xzf mongodb-macos-*-${{ env.DB_VERSION }}.tgz
-                cp ./mongodb-*/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
+              if [[ "$RUNNER_OS" == "Windows" ]]; then
+                curl -LO https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-${DB_VERSION}.zip
+                unzip mongodb-windows-x86_64-${DB_VERSION}.zip -d ./temp
+                cp ./temp/mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+              elif [[ "$RUNNER_OS" == "macOS" ]]; then
+                curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
+                tar -xzf mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
+                cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
-                curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${{ env.DB_VERSION }}.tgz
-                tar -xzf mongodb-linux-*.tgz
-                cp ./mongodb-*/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
+                curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
+                tar -xzf mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
+                cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
             postgresql)
-              if [[ "${{ runner.os }}" == "Windows" ]]; then
-                choco install postgresql --version=${{ env.DB_VERSION }} -y
-                cp "C:/Program Files/PostgreSQL/${{ env.DB_VERSION }}/bin/*" ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
-              elif [[ "${{ runner.os }}" == "macOS" ]]; then
-                brew install postgresql@${{ env.DB_MAJOR_VERSION }}
-                cp $(brew --prefix postgresql@${{ env.DB_MAJOR_VERSION }})/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
+              if [[ "$RUNNER_OS" == "Windows" ]]; then
+                choco install postgresql --version=${DB_VERSION} -y
+                cp "C:/Program Files/PostgreSQL/${DB_VERSION}/bin/*" ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+              elif [[ "$RUNNER_OS" == "macOS" ]]; then
+                brew install postgresql@${DB_MAJOR_VERSION}
+                cp $(brew --prefix postgresql@${DB_MAJOR_VERSION})/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
-                sudo apt update && sudo apt install postgresql-${{ env.DB_MAJOR_VERSION }} -y
-                cp /usr/lib/postgresql/${{ env.DB_MAJOR_VERSION }}/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
+                sudo apt update && sudo apt install postgresql-${DB_MAJOR_VERSION} -y
+                cp /usr/lib/postgresql/${DB_MAJOR_VERSION}/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
             clickhouse)
-              if [[ "${{ runner.os }}" == "macOS" ]]; then
+              if [[ "$RUNNER_OS" == "macOS" ]]; then
                 brew install clickhouse
-                cp $(brew --prefix clickhouse)/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
-              elif [[ "${{ runner.os }}" == "Linux" ]]; then
+                cp $(brew --prefix clickhouse)/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+              elif [[ "$RUNNER_OS" == "Linux" ]]; then
                 curl -LO https://builds.clickhouse.com/master/x86_64/clickhouse
                 chmod +x clickhouse
-                mv clickhouse ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
+                mv clickhouse ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
           esac
 
       - name: Archive binaries into platform-specific package
         run: |
-          mkdir -p ./packages/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}
-          cd ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}
+          mkdir -p ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}
+          cd ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}
           if [[ "${{ matrix.ext }}" == "zip" ]]; then
-            7z a ../../../../packages/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}.zip *
+            7z a ../../../../packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.zip *
           else
-            tar -czf ../../../../packages/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}.tar.gz *
+            tar -czf ../../../../packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.tar.gz *
           fi
 
       - name: Upload to R2
