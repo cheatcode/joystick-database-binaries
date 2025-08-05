@@ -118,7 +118,7 @@ jobs:
         run: |
           echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
           echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
-          echo "DB_MAJOR_VERSION=${{ matrix.db_version%%.* }}" >> $GITHUB_ENV
+          echo "DB_MAJOR_VERSION=$(echo '${{ matrix.db_version }}' | cut -d. -f1)" >> $GITHUB_ENV
 
       - name: Skip unsupported combo (clickhouse + windows)
         if: ${{ matrix.database == 'clickhouse' && matrix.platform == 'windows' }}
@@ -155,7 +155,8 @@ jobs:
                 unzip mongodb-windows-x86_64-${{ env.DB_VERSION }}.zip -d ./temp
                 cp ./temp/mongodb-*/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "${{ runner.os }}" == "macOS" ]]; then
-                curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${{ matrix.arch#_ }}-${{ env.DB_VERSION }}.tgz
+                arch_value=$(echo "${{ matrix.arch }}" | sed 's/^_//')
+                curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${arch_value}-${{ env.DB_VERSION }}.tgz
                 tar -xzf mongodb-macos-*-${{ env.DB_VERSION }}.tgz
                 cp ./mongodb-*/bin/* ./raw/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
