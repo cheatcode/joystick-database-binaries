@@ -5,7 +5,6 @@ on:
 
 jobs:
   build:
-    environment: production
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -91,6 +90,8 @@ jobs:
             arch: _x86_64
             ext: zip
 
+    environment: production
+
     env:
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -101,12 +102,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set environment variables
+      - name: Set environment variables (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
           echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
           echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
           echo "DB_MAJOR_VERSION=$(echo '${{ matrix.db_version }}' | cut -d. -f1)" >> $GITHUB_ENV
           echo "ARCH_CLEAN=$(echo '${{ matrix.arch }}' | sed 's/^_//')" >> $GITHUB_ENV
+
+      - name: Set environment variables (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
+          echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
+          echo "DB_MAJOR_VERSION=${{ matrix.db_version.split('.')[0] }}" >> $GITHUB_ENV
+          echo "ARCH_CLEAN=${{ matrix.arch.startsWith('_') && matrix.arch.substring(1) || matrix.arch }}" >> $GITHUB_ENV
 
       - name: Set up architecture switching (x86_64 on macOS)
         if: matrix.arch == '_x86_64' && matrix.platform == 'macos'
