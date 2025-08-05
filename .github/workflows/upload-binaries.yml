@@ -117,8 +117,8 @@ jobs:
         run: |
           echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
           echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
-          echo "DB_MAJOR_VERSION=${{ matrix.db_version.split('.')[0] }}" >> $GITHUB_ENV
-          echo "ARCH_CLEAN=${{ matrix.arch.startsWith('_') && matrix.arch.substring(1) || matrix.arch }}" >> $GITHUB_ENV
+          echo "DB_MAJOR_VERSION=${{ matrix.db_version }}" | cut -d. -f1 >> $GITHUB_ENV
+          echo "ARCH_CLEAN=${{ matrix.arch }}" | sed 's/^_//' >> $GITHUB_ENV
 
       - name: Set up architecture switching (x86_64 on macOS)
         if: matrix.arch == '_x86_64' && matrix.platform == 'macos'
