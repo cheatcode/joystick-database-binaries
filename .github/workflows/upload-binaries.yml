@@ -97,6 +97,9 @@ jobs:
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set environment variables
         run: |
           echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
@@ -157,6 +160,7 @@ jobs:
           esac
 
       - name: Archive binaries into platform-specific package
+        shell: bash
         run: |
           mkdir -p ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}
           if [[ "${{ matrix.ext }}" == "zip" ]]; then
@@ -165,15 +169,11 @@ jobs:
             tar -czf ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.tar.gz -C ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }} .
           fi
 
-      - name: Upload to R2
-        uses: jakejarvis/s3-sync-action@master
-        with:
-          args: --acl public-read --follow-symlinks
-        env:
-          AWS_S3_BUCKET: ${{ env.R2_BUCKET }}
-          AWS_ACCESS_KEY_ID: ${{ env.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.R2_SECRET_ACCESS_KEY }}
-          AWS_REGION: "us-east-1"
-          SOURCE_DIR: ./packages/${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}
-          DEST_DIR: ${{ env.DATABASE }}/${{ env.DB_MAJOR_VERSION }}/${{ matrix.platform }}
-          S3_ENDPOINT: ${{ env.R2_ENDPOINT }}
+      - name: Upload to R2 with aws-cli
+        shell: bash
+        run: |
+          pip install --upgrade awscli
+          export AWS_ACCESS_KEY_ID=${{ env.R2_ACCESS_KEY_ID }}
+          export AWS_SECRET_ACCESS_KEY=${{ env.R2_SECRET_ACCESS_KEY }}
+          export AWS_DEFAULT_REGION=us-east-1
+          aws s3 cp ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/ s3://${{ env.R2_BUCKET }}/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/ --recursive --endpoint-url ${{ env.R2_ENDPOINT }}
