@@ -135,7 +135,7 @@ jobs:
                 curl -s -X GET "https://www.memurai.com/api/request-download-link?version=windows-redis" -o memurai.json
                 MEMURAI_URL=$(jq -r .url memurai.json)
                 curl -L -o memurai.msi "$MEMURAI_URL"
-                powershell Start-Process msiexec.exe -Wait -ArgumentList "/a memurai.msi /quiet TARGETDIR=$(pwd)\\memurai_extracted"
+                powershell Start-Process msiexec.exe -Wait -ArgumentList '/a', 'memurai.msi', '/quiet', "TARGETDIR=\"$(pwd)\\memurai_extracted\""
                 cp -r memurai_extracted/Memurai/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               elif [[ "$RUNNER_OS" == "macOS" ]]; then
                 brew install redis
