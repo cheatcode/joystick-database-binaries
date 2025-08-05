@@ -87,26 +87,6 @@ jobs:
             arch: _x86_64
             ext: zip
 
-          # Clickhouse (no windows)
-          - database: clickhouse
-            db_version: 24.4.1.2280
-            os: macos-latest
-            platform: macos
-            arch: arm64
-            ext: tar.gz
-          - database: clickhouse
-            db_version: 24.4.1.2280
-            os: macos-latest
-            platform: macos
-            arch: _x86_64
-            ext: tar.gz
-          - database: clickhouse
-            db_version: 24.4.1.2280
-            os: ubuntu-latest
-            platform: linux
-            arch: _x86_64
-            ext: tar.gz
-
     env:
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -120,12 +100,6 @@ jobs:
           echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
           echo "DB_MAJOR_VERSION=$(echo '${{ matrix.db_version }}' | cut -d. -f1)" >> $GITHUB_ENV
           echo "ARCH_CLEAN=$(echo '${{ matrix.arch }}' | sed 's/^_//')" >> $GITHUB_ENV
-
-      - name: Skip unsupported combo (clickhouse + windows)
-        if: ${{ matrix.database == 'clickhouse' && matrix.platform == 'windows' }}
-        run: |
-          echo "Clickhouse is not supported on Windows. Skipping job."
-          exit 0
 
       - name: Set up architecture switching (x86_64 on macOS)
         if: matrix.arch == '_x86_64' && matrix.platform == 'macos'
@@ -177,26 +151,15 @@ jobs:
                 cp /usr/lib/postgresql/${DB_MAJOR_VERSION}/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
-            clickhouse)
-              if [[ "$RUNNER_OS" == "macOS" ]]; then
-                brew install clickhouse
-                cp $(brew --prefix clickhouse)/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              elif [[ "$RUNNER_OS" == "Linux" ]]; then
-                curl -LO https://builds.clickhouse.com/master/x86_64/clickhouse
-                chmod +x clickhouse
-                mv clickhouse ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              fi
-              ;;
           esac
 
       - name: Archive binaries into platform-specific package
         run: |
           mkdir -p ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}
-          cd ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}
           if [[ "${{ matrix.ext }}" == "zip" ]]; then
-            7z a ../../../../packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.zip *
+            7z a ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.zip ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/*
           else
-            tar -czf ../../../../packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.tar.gz *
+            tar -czf ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.tar.gz -C ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }} .
           fi
 
       - name: Upload to R2
