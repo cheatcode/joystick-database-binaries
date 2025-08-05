@@ -31,12 +31,6 @@ jobs:
             platform: linux
             arch: _x86_64
             ext: tar.gz
-          - database: mongodb
-            db_version: 8.0.0
-            os: windows-latest
-            platform: windows
-            arch: _x86_64
-            ext: zip
 
           # PostgreSQL
           - database: postgresql
@@ -57,12 +51,6 @@ jobs:
             platform: linux
             arch: _x86_64
             ext: tar.gz
-          - database: postgresql
-            db_version: 16.0
-            os: windows-latest
-            platform: windows
-            arch: _x86_64
-            ext: zip
 
           # Redis
           - database: redis
@@ -83,12 +71,6 @@ jobs:
             platform: linux
             arch: _x86_64
             ext: tar.gz
-          - database: redis
-            db_version: 7.0.15
-            os: windows-latest
-            platform: windows
-            arch: _x86_64
-            ext: zip
 
     environment: production
 
@@ -102,17 +84,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set environment variables (Linux/macOS)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
-          echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
-          echo "DB_MAJOR_VERSION=$(echo '${{ matrix.db_version }}' | cut -d. -f1)" >> $GITHUB_ENV
-          echo "ARCH_CLEAN=$(echo '${{ matrix.arch }}' | sed 's/^_//')" >> $GITHUB_ENV
-
-      - name: Set environment variables (Windows)
-        if: runner.os == 'Windows'
+      - name: Set environment variables
         shell: bash
         run: |
           echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
@@ -131,13 +103,7 @@ jobs:
 
           case "$DATABASE" in
             redis)
-              if [[ "$RUNNER_OS" == "Windows" ]]; then
-                curl -s -X GET "https://www.memurai.com/api/request-download-link?version=windows-redis" -o memurai.json
-                MEMURAI_URL=$(jq -r .url memurai.json)
-                curl -L -o memurai.msi "$MEMURAI_URL"
-                powershell Start-Process msiexec.exe -Wait -ArgumentList '/a', 'memurai.msi', '/quiet', "TARGETDIR=\"$(pwd)\\memurai_extracted\""
-                cp -r memurai_extracted/Memurai/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              elif [[ "$RUNNER_OS" == "macOS" ]]; then
+              if [[ "$RUNNER_OS" == "macOS" ]]; then
                 brew install redis
                 cp $(brew --prefix redis)/bin/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
@@ -146,11 +112,7 @@ jobs:
               fi
               ;;
             mongodb)
-              if [[ "$RUNNER_OS" == "Windows" ]]; then
-                curl -LO https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-${DB_VERSION}.zip
-                unzip mongodb-windows-x86_64-${DB_VERSION}.zip -d ./temp
-                cp ./temp/mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              elif [[ "$RUNNER_OS" == "macOS" ]]; then
+              if [[ "$RUNNER_OS" == "macOS" ]]; then
                 curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
                 tar -xzf mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
                 cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
@@ -161,11 +123,7 @@ jobs:
               fi
               ;;
             postgresql)
-              if [[ "$RUNNER_OS" == "Windows" ]]; then
-                choco install postgresql --version=${DB_VERSION} -y
-                POSTGRES_PATH="C:/Program Files/PostgreSQL/${DB_MAJOR_VERSION}/bin"
-                cp -r "${POSTGRES_PATH}"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              elif [[ "$RUNNER_OS" == "macOS" ]]; then
+              if [[ "$RUNNER_OS" == "macOS" ]]; then
                 brew install postgresql@${DB_MAJOR_VERSION}
                 cp $(brew --prefix postgresql@${DB_MAJOR_VERSION})/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
@@ -179,11 +137,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}
-          if [[ "${{ matrix.ext }}" == "zip" ]]; then
-            7z a ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.zip ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/*
-          else
-            tar -czf ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.tar.gz -C ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }} .
-          fi
+          tar -czf ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.tar.gz -C ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }} .
 
       - name: Upload to R2 with aws-cli
         shell: bash
