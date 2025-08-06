@@ -117,8 +117,13 @@ jobs:
                 tar -xzf mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
                 cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
 
-                brew install mongosh
-                cp $(brew --prefix mongosh)/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+                  /opt/homebrew/bin/brew install mongosh
+                  cp /opt/homebrew/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                else
+                  arch -x86_64 /usr/local/bin/brew install mongosh
+                  cp /usr/local/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                fi
               else
                 curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
                 tar -xzf mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
