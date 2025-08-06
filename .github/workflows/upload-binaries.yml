@@ -23,13 +23,13 @@ jobs:
             db_version: 8.0.0
             os: macos-latest
             platform: macos
-            arch: _x86_64
+            arch: x86_64
             ext: tar.gz
           - database: mongodb
             db_version: 8.0.0
             os: ubuntu-latest
             platform: linux
-            arch: _x86_64
+            arch: x86_64
             ext: tar.gz
 
           # PostgreSQL
@@ -43,13 +43,13 @@ jobs:
             db_version: 16.0
             os: macos-latest
             platform: macos
-            arch: _x86_64
+            arch: x86_64
             ext: tar.gz
           - database: postgresql
             db_version: 16.0
             os: ubuntu-latest
             platform: linux
-            arch: _x86_64
+            arch: x86_64
             ext: tar.gz
 
           # Redis
@@ -63,13 +63,13 @@ jobs:
             db_version: 7.0.15
             os: macos-latest
             platform: macos
-            arch: _x86_64
+            arch: x86_64
             ext: tar.gz
           - database: redis
             db_version: 7.0.15
             os: ubuntu-latest
             platform: linux
-            arch: _x86_64
+            arch: x86_64
             ext: tar.gz
 
     environment: production
@@ -96,7 +96,7 @@ jobs:
           echo "ARCH_CLEAN=$(echo '${{ matrix.arch }}' | sed 's/^_//')" >> $GITHUB_ENV
 
       - name: Set up architecture switching (x86_64 on macOS)
-        if: matrix.arch == '_x86_64' && matrix.platform == 'macos'
+        if: matrix.arch == 'x86_64' && matrix.platform == 'macos'
         run: echo "alias brew='arch -x86_64 /usr/local/bin/brew'" >> $GITHUB_ENV
 
       - name: Install dependencies and fetch binaries
