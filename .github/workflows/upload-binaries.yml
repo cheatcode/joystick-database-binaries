@@ -79,6 +79,9 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      MACOS_IDENTITY: ${{ secrets.MACOS_IDENTITY }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
 
     steps:
       - name: Checkout code
@@ -132,6 +135,28 @@ jobs:
               fi
               ;;
           esac
+
+      - name: Sign binaries on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "$MACOS_CERT_P12_BASE64" | base64 --decode > certificate.p12
+
+          security create-keychain -p temp temp.keychain
+          security default-keychain -s temp.keychain
+          security unlock-keychain -p temp temp.keychain
+
+          security import certificate.p12 -k temp.keychain -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k temp temp.keychain
+
+          echo "Signing binaries in ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}..."
+
+          for file in ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/*; do
+            if [[ -x "$file" && ! -d "$file" ]]; then
+              echo "Signing $file"
+              codesign --force --options runtime --timestamp --sign "$MACOS_IDENTITY" "$file"
+            fi
+          done
 
       - name: Archive binaries into platform-specific package
         shell: bash
