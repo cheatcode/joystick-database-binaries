@@ -116,10 +116,17 @@ jobs:
                 curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
                 tar -xzf mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
                 cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+
+                brew install mongosh
+                cp $(brew --prefix mongosh)/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
                 curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
                 tar -xzf mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
                 cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+
+                curl -LO https://downloads.mongodb.com/compass/mongosh-${DB_VERSION}-linux-x64.tgz
+                tar -xzf mongosh-${DB_VERSION}-linux-x64.tgz
+                cp ./mongosh-${DB_VERSION}-linux-x64/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
             postgresql)
