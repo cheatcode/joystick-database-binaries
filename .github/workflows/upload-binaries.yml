@@ -84,19 +84,15 @@ jobs:
 
           case "${{ matrix.database }}" in
             mongodb)
-              git clone --branch r7.0.11 https://github.com/mongodb/mongo.git
+              git clone https://github.com/mongodb/mongo.git
               cd mongo
-
-              python3 -m venv venv
-              source venv/bin/activate
-              pip install -r buildscripts/requirements.txt
-
+              python3 -m pip install -r buildscripts/requirements.txt
               python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install
-              cp /tmp/mongodb_install/bin/mongod $GITHUB_WORKSPACE/raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
+              cp /tmp/mongodb_install/bin/mongod ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
 
               curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-${{ matrix.platform == 'macos' && (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') || 'linux-x64' }}.zip
               unzip mongosh-2.5.6-*.zip -d mongosh
-              cp mongosh/bin/mongosh $GITHUB_WORKSPACE/raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
+              cp mongosh/bin/mongosh ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
               ;;
             postgresql)
               curl -LO https://ftp.postgresql.org/pub/source/v17.0/postgresql-17.0.tar.gz
