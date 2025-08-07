@@ -82,6 +82,13 @@ jobs:
         run: |
           brew install openssl readline zlib cmake pkg-config python git curl
 
+      - name: Configure macOS SDK and compiler (MongoDB only)
+        if: runner.os == 'macOS' && matrix.database == 'mongodb'
+        shell: bash
+        run: |
+          echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+
       - name: Build and copy binaries
         shell: bash
         run: |
@@ -98,9 +105,9 @@ jobs:
               pip install 'jsonschema<4.20.0' 'referencing<0.31.0' networkx cxxfilt
 
               if [[ "${{ matrix.platform }}" == "linux" ]]; then
-                python3 buildscripts/scons.py MONGO_DISTMOD=ubuntu2004 DESTDIR=/tmp/mongodb_install install-mongod --linker=gold
+                python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install --linker=gold
               else
-                python3 buildscripts/scons.py install-mongod --variables-files=etc/scons/macos_clang.vars --prefix=/tmp/mongodb_install
+                python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install
               fi
 
               cp /tmp/mongodb_install/bin/mongod $GITHUB_WORKSPACE/raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
