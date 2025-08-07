@@ -40,25 +40,25 @@ jobs:
 
           # PostgreSQL
           - database: postgresql
-            db_version: "17.0"
+            db_version: 17
             os: macos-latest
             platform: macos
             arch: arm64
             ext: tar.gz
           - database: postgresql
-            db_version: "17.0"
+            db_version: 17
             os: macos-latest
             platform: macos
             arch: x86_64
             ext: tar.gz
           - database: postgresql
-            db_version: "17.0"
+            db_version: 17.6
             os: ubuntu-latest
             platform: linux
             arch: x86_64
             ext: tar.gz
           - database: postgresql
-            db_version: "17.0"
+            db_version: 17.6
             os: ubuntu-latest
             platform: linux
             arch: arm64
@@ -113,12 +113,11 @@ jobs:
       - name: Install dependencies and fetch binaries
         shell: bash
         run: |
-          set -euo pipefail
           mkdir -p ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}
 
           case "$DATABASE" in
             redis)
-              curl -LO https://download.redis.io/releases/redis-${DB_VERSION}.tar.gz
+              curl -LO http://download.redis.io/releases/redis-${DB_VERSION}.tar.gz
               tar -xzf redis-${DB_VERSION}.tar.gz
               make -C redis-${DB_VERSION}
               cp redis-${DB_VERSION}/src/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
@@ -162,17 +161,26 @@ jobs:
               if [[ "$RUNNER_OS" == "macOS" ]]; then
                 POSTGRES_APP_VERSION="2.6.8"
                 DMG_NAME="Postgres-${POSTGRES_APP_VERSION}-${DB_MAJOR_VERSION}.dmg"
-                curl -LO "https://github.com/PostgresApp/PostgresApp/releases/download/v${POSTGRES_APP_VERSION}/${DMG_NAME}"
-                hdiutil attach "${DMG_NAME}" -mountpoint /Volumes/PostgresApp -nobrowse -quiet
-                cp -R "/Volumes/PostgresApp/Contents/Versions/${DB_MAJOR_VERSION}/bin"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-                hdiutil detach /Volumes/PostgresApp -quiet
+                curl -L -O "https://github.com/PostgresApp/PostgresApp/releases/download/v${POSTGRES_APP_VERSION}/${DMG_NAME}"
+
+                MOUNT_OUTPUT=$(hdiutil attach "${DMG_NAME}" -nobrowse -quiet)
+                MOUNT_DIR=$(echo "$MOUNT_OUTPUT" | grep "/Volumes/" | awk '{print $NF}' | head -n1)
+
+                if [[ ! -d "$MOUNT_DIR/Contents/Versions/${DB_MAJOR_VERSION}/bin" ]]; then
+                  echo "ERROR: Could not find expected PostgreSQL bin directory at $MOUNT_DIR/Contents/Versions/${DB_MAJOR_VERSION}/bin"
+                  ls -R "$MOUNT_DIR" || true
+                  exit 1
+                fi
+
+                cp -R "$MOUNT_DIR/Contents/Versions/${DB_MAJOR_VERSION}/bin/"* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp -R "$MOUNT_DIR/Contents/Versions/${DB_MAJOR_VERSION}/lib/"* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/ || true
+
+                hdiutil detach "$MOUNT_DIR" -quiet
               else
-                curl -fLO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
+                curl -LO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
                 tar -xzf postgresql-${DB_VERSION}.tar.gz
                 cd postgresql-${DB_VERSION}
-                sudo apt-get update
-                sudo apt-get install -y libreadline-dev
-                ./configure --prefix=$GITHUB_WORKSPACE/pgsql --disable-rpath
+                ./configure --prefix=$GITHUB_WORKSPACE/pgsql --without-readline --without-zlib --without-icu --disable-shared --enable-static --disable-rpath
                 make -j$(nproc)
                 make install
                 cp $GITHUB_WORKSPACE/pgsql/bin/* ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
