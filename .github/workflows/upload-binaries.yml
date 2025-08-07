@@ -38,7 +38,7 @@ jobs:
             arch: arm64
             ext: tar.gz
 
-          # PostgreSQL (now all use 17.6)
+          # PostgreSQL
           - database: postgresql
             db_version: 17.6
             os: macos-latest
@@ -166,14 +166,18 @@ jobs:
                 MOUNT_OUTPUT=$(hdiutil attach "${DMG_NAME}" -nobrowse -quiet)
                 MOUNT_DIR=$(echo "$MOUNT_OUTPUT" | grep "/Volumes/" | awk '{print $NF}' | head -n1)
 
-                if [[ ! -d "$MOUNT_DIR/Contents/Versions/${DB_MAJOR_VERSION}/bin" ]]; then
-                  echo "ERROR: Could not find expected PostgreSQL bin directory at $MOUNT_DIR/Contents/Versions/${DB_MAJOR_VERSION}/bin"
+                APP_PATH=$(find "$MOUNT_DIR" -name "Postgres.app" -type d | head -n 1)
+                BIN_DIR="${APP_PATH}/Contents/Versions/${DB_MAJOR_VERSION}/bin"
+                LIB_DIR="${APP_PATH}/Contents/Versions/${DB_MAJOR_VERSION}/lib"
+
+                if [[ ! -d "$BIN_DIR" ]]; then
+                  echo "ERROR: Could not find expected PostgreSQL bin directory at $BIN_DIR"
                   ls -R "$MOUNT_DIR" || true
                   exit 1
                 fi
 
-                cp -R "$MOUNT_DIR/Contents/Versions/${DB_MAJOR_VERSION}/bin/"* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-                cp -R "$MOUNT_DIR/Contents/Versions/${DB_MAJOR_VERSION}/lib/"* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/ || true
+                cp -R "$BIN_DIR"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp -R "$LIB_DIR"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/ || true
 
                 hdiutil detach "$MOUNT_DIR" -quiet
               else
