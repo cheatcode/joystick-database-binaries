@@ -40,25 +40,25 @@ jobs:
 
           # PostgreSQL
           - database: postgresql
-            db_version: 17.0
+            db_version: "17.0"
             os: macos-latest
             platform: macos
             arch: arm64
             ext: tar.gz
           - database: postgresql
-            db_version: 17.0
+            db_version: "17.0"
             os: macos-latest
             platform: macos
             arch: x86_64
             ext: tar.gz
           - database: postgresql
-            db_version: 17.0
+            db_version: "17.0"
             os: ubuntu-latest
             platform: linux
             arch: x86_64
             ext: tar.gz
           - database: postgresql
-            db_version: 17.0
+            db_version: "17.0"
             os: ubuntu-latest
             platform: linux
             arch: arm64
