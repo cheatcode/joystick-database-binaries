@@ -159,34 +159,24 @@ jobs:
               fi
               ;;
             postgresql)
-              curl -fLO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
-              tar -xzf postgresql-${DB_VERSION}.tar.gz
-              cd postgresql-${DB_VERSION}
-
-              if [[ "$RUNNER_OS" == "Linux" ]]; then
+              if [[ "$RUNNER_OS" == "macOS" ]]; then
+                POSTGRES_APP_VERSION="2.6.8"
+                DMG_NAME="Postgres-${POSTGRES_APP_VERSION}-${DB_MAJOR_VERSION}.dmg"
+                curl -LO "https://github.com/PostgresApp/PostgresApp/releases/download/v${POSTGRES_APP_VERSION}/${DMG_NAME}"
+                hdiutil attach "${DMG_NAME}" -mountpoint /Volumes/PostgresApp -nobrowse -quiet
+                cp -R "/Volumes/PostgresApp/Contents/Versions/${DB_MAJOR_VERSION}/bin"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                hdiutil detach /Volumes/PostgresApp -quiet
+              else
+                curl -fLO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
+                tar -xzf postgresql-${DB_VERSION}.tar.gz
+                cd postgresql-${DB_VERSION}
                 sudo apt-get update
                 sudo apt-get install -y libreadline-dev
                 ./configure --prefix=$GITHUB_WORKSPACE/pgsql --disable-rpath
-              else
-                export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
-                unset CPATH
-                unset LIBRARY_PATH
-                unset LD_LIBRARY_PATH
-                unset PKG_CONFIG_PATH
-                export LDFLAGS="-L/usr/local/lib"
-                export CPPFLAGS="-I/usr/local/include"
-                rm -f config.cache
-                ./configure \
-                  --prefix=$GITHUB_WORKSPACE/pgsql \
-                  --without-icu \
-                  --disable-shared \
-                  --enable-static \
-                  --disable-rpath
+                make -j$(nproc)
+                make install
+                cp $GITHUB_WORKSPACE/pgsql/bin/* ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
-
-              make -j$(nproc || sysctl -n hw.ncpu)
-              make install
-              cp $GITHUB_WORKSPACE/pgsql/bin/* ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               ;;
           esac
 
