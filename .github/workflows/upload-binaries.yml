@@ -31,6 +31,12 @@ jobs:
             platform: linux
             arch: x86_64
             ext: tar.gz
+          - database: mongodb
+            db_version: 8.0.12
+            os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            ext: tar.gz
 
           # PostgreSQL
           - database: postgresql
@@ -51,6 +57,12 @@ jobs:
             platform: linux
             arch: x86_64
             ext: tar.gz
+          - database: postgresql
+            db_version: 17.6
+            os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            ext: tar.gz
 
           # Redis
           - database: redis
@@ -70,6 +82,12 @@ jobs:
             os: ubuntu-latest
             platform: linux
             arch: x86_64
+            ext: tar.gz
+          - database: redis
+            db_version: 7.2.5
+            os: ubuntu-latest
+            platform: linux
+            arch: arm64
             ext: tar.gz
 
     environment: production
@@ -105,8 +123,10 @@ jobs:
                 make -C redis-${DB_VERSION}
                 cp redis-${DB_VERSION}/src/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
-                sudo apt update && sudo apt install redis-server -y
-                cp $(which redis-server) ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                curl -LO http://download.redis.io/releases/redis-${DB_VERSION}.tar.gz
+                tar -xzf redis-${DB_VERSION}.tar.gz
+                make -C redis-${DB_VERSION}
+                cp redis-${DB_VERSION}/src/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
             mongodb)
@@ -125,13 +145,23 @@ jobs:
                   cp ./mongosh-2.5.6-darwin-x64/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
                 fi
               else
-                curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
-                tar -xzf mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
-                cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+                  curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-aarch64-ubuntu2204-${DB_VERSION}.tgz
+                  tar -xzf mongodb-linux-aarch64-ubuntu2204-${DB_VERSION}.tgz
+                  cp ./mongodb-linux-aarch64-ubuntu2204-${DB_VERSION}/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
 
-                curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-linux-x64.tgz
-                tar -xzf mongosh-2.5.6-linux-x64.tgz
-                cp ./mongosh-2.5.6-linux-x64/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                  curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-linux-arm64.tgz
+                  tar -xzf mongosh-2.5.6-linux-arm64.tgz
+                  cp ./mongosh-2.5.6-linux-arm64/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                else
+                  curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
+                  tar -xzf mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
+                  cp ./mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+
+                  curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-linux-x64.tgz
+                  tar -xzf mongosh-2.5.6-linux-x64.tgz
+                  cp ./mongosh-2.5.6-linux-x64/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                fi
               fi
               ;;
             postgresql)
@@ -140,8 +170,18 @@ jobs:
                 tar -xzf postgresql-${DB_VERSION}-1-osx-${ARCH_CLEAN}.tar.gz
                 cp ./pgsql/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
-                sudo apt update && sudo apt install postgresql-${DB_MAJOR_VERSION} -y || sudo apt install postgresql -y
-                cp /usr/lib/postgresql/${DB_MAJOR_VERSION}/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/ || cp /usr/lib/postgresql/*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+                  curl -LO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
+                  tar -xzf postgresql-${DB_VERSION}.tar.gz
+                  cd postgresql-${DB_VERSION}
+                  ./configure --prefix=$GITHUB_WORKSPACE/pgsql
+                  make -j$(nproc)
+                  make install
+                  cp $GITHUB_WORKSPACE/pgsql/bin/* ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                else
+                  sudo apt update && sudo apt install postgresql-${DB_MAJOR_VERSION} -y || sudo apt install postgresql -y
+                  cp /usr/lib/postgresql/${DB_MAJOR_VERSION}/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/ || cp /usr/lib/postgresql/*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                fi
               fi
               ;;
           esac
