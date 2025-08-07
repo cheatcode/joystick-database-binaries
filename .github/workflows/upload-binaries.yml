@@ -95,7 +95,6 @@ jobs:
               python3 -m venv venv
               source venv/bin/activate
               pip install -r buildscripts/requirements.txt
-              pip install 'jsonschema<4.20.0'
               python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install
               cp /tmp/mongodb_install/bin/mongod $GITHUB_WORKSPACE/raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
 
