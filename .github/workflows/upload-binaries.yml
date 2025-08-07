@@ -98,11 +98,9 @@ jobs:
               pip install 'jsonschema<4.20.0' 'referencing<0.31.0' networkx cxxfilt
 
               if [[ "${{ matrix.platform }}" == "linux" ]]; then
-                python3 buildscripts/scons.py MONGO_DISTMOD=ubuntu2004 DESTDIR=/tmp/mongodb_install install-mongod --linker=gold --disable-warnings-as-errors
+                python3 buildscripts/scons.py MONGO_DISTMOD=ubuntu2004 DESTDIR=/tmp/mongodb_install install-mongod --linker=gold
               else
-                export CC=clang
-                export CXX=clang++
-                python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install
+                python3 buildscripts/scons.py install-mongod --variables-files=etc/scons/macos_clang.vars --prefix=/tmp/mongodb_install
               fi
 
               cp /tmp/mongodb_install/bin/mongod $GITHUB_WORKSPACE/raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
