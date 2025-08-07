@@ -34,19 +34,19 @@ jobs:
 
           # PostgreSQL
           - database: postgresql
-            db_version: 17.6
+            db_version: 17.5
             os: macos-latest
             platform: macos
             arch: arm64
             ext: tar.gz
           - database: postgresql
-            db_version: 17.6
+            db_version: 17.5
             os: macos-latest
             platform: macos
             arch: x86_64
             ext: tar.gz
           - database: postgresql
-            db_version: 17.6
+            db_version: 17.5
             os: ubuntu-latest
             platform: linux
             arch: x86_64
@@ -96,53 +96,45 @@ jobs:
         shell: bash
         run: |
           mkdir -p ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}
+          cd /tmp
 
           case "$DATABASE" in
             redis)
-              if [[ "$RUNNER_OS" == "macOS" ]]; then
-                curl -LO https://download.redis.io/releases/redis-${DB_VERSION}.tar.gz
-                tar -xzf redis-${DB_VERSION}.tar.gz
-                make -C redis-${DB_VERSION}
-                cp redis-${DB_VERSION}/src/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              else
-                sudo apt update && sudo apt install redis-server -y
-                cp $(which redis-server) ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              fi
+              curl -LO https://download.redis.io/releases/redis-${DB_VERSION}.tar.gz
+              tar -xzf redis-${DB_VERSION}.tar.gz
+              cd redis-${DB_VERSION}
+              make
+              cp src/redis-server $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               ;;
+
             mongodb)
               if [[ "$RUNNER_OS" == "macOS" ]]; then
                 curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
                 tar -xzf mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
-                cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp ./mongodb-*/bin/* $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
 
-                if [[ "${{ matrix.arch }}" == "arm64" ]]; then
-                  curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-darwin-arm64.zip
-                  unzip mongosh-2.5.6-darwin-arm64.zip
-                  cp ./mongosh-2.5.6-darwin-arm64/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-                else
-                  curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-darwin-x64.zip
-                  unzip mongosh-2.5.6-darwin-x64.zip
-                  cp ./mongosh-2.5.6-darwin-x64/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-                fi
+                curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-darwin-${ARCH_CLEAN}.zip
+                unzip mongosh-2.5.6-darwin-${ARCH_CLEAN}.zip
+                cp mongosh-2.5.6-darwin-${ARCH_CLEAN}/bin/mongosh $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               else
                 curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
                 tar -xzf mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
-                cp ./mongodb-*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp ./mongodb-*/bin/* $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
 
                 curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-linux-x64.tgz
                 tar -xzf mongosh-2.5.6-linux-x64.tgz
-                cp ./mongosh-2.5.6-linux-x64/bin/mongosh ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp ./mongosh-2.5.6-linux-x64/bin/mongosh $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               fi
               ;;
+
             postgresql)
-              if [[ "$RUNNER_OS" == "macOS" ]]; then
-                curl -LO https://get.enterprisedb.com/postgresql/postgresql-${DB_VERSION}-1-osx-${ARCH_CLEAN}.tar.gz
-                tar -xzf postgresql-${DB_VERSION}-1-osx-${ARCH_CLEAN}.tar.gz
-                cp ./pgsql/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              else
-                sudo apt update && sudo apt install postgresql-${DB_MAJOR_VERSION} -y || sudo apt install postgresql -y
-                cp /usr/lib/postgresql/${DB_MAJOR_VERSION}/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/ || cp /usr/lib/postgresql/*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              fi
+              curl -LO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
+              tar -xzf postgresql-${DB_VERSION}.tar.gz
+              cd postgresql-${DB_VERSION}
+              ./configure --prefix=/tmp/pgsql
+              make world -j2
+              make install-world
+              cp /tmp/pgsql/bin/* $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               ;;
           esac
 
