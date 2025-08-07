@@ -113,21 +113,15 @@ jobs:
       - name: Install dependencies and fetch binaries
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}
 
           case "$DATABASE" in
             redis)
-              if [[ "$RUNNER_OS" == "macOS" ]]; then
-                curl -LO https://download.redis.io/releases/redis-${DB_VERSION}.tar.gz
-                tar -xzf redis-${DB_VERSION}.tar.gz
-                make -C redis-${DB_VERSION}
-                cp redis-${DB_VERSION}/src/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              else
-                curl -LO http://download.redis.io/releases/redis-${DB_VERSION}.tar.gz
-                tar -xzf redis-${DB_VERSION}.tar.gz
-                make -C redis-${DB_VERSION}
-                cp redis-${DB_VERSION}/src/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              fi
+              curl -LO https://download.redis.io/releases/redis-${DB_VERSION}.tar.gz
+              tar -xzf redis-${DB_VERSION}.tar.gz
+              make -C redis-${DB_VERSION}
+              cp redis-${DB_VERSION}/src/redis-server ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               ;;
             mongodb)
               if [[ "$RUNNER_OS" == "macOS" ]]; then
@@ -165,24 +159,13 @@ jobs:
               fi
               ;;
             postgresql)
-              if [[ "$RUNNER_OS" == "macOS" ]]; then
-                curl -LO https://get.enterprisedb.com/postgresql/postgresql-${DB_VERSION}-1-osx-${ARCH_CLEAN}.tar.gz
-                tar -xzf postgresql-${DB_VERSION}-1-osx-${ARCH_CLEAN}.tar.gz
-                cp ./pgsql/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-              else
-                if [[ "${{ matrix.arch }}" == "arm64" ]]; then
-                  curl -LO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
-                  tar -xzf postgresql-${DB_VERSION}.tar.gz
-                  cd postgresql-${DB_VERSION}
-                  ./configure --prefix=$GITHUB_WORKSPACE/pgsql
-                  make -j$(nproc)
-                  make install
-                  cp $GITHUB_WORKSPACE/pgsql/bin/* ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-                else
-                  sudo apt update && sudo apt install postgresql-${DB_MAJOR_VERSION} -y || sudo apt install postgresql -y
-                  cp /usr/lib/postgresql/${DB_MAJOR_VERSION}/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/ || cp /usr/lib/postgresql/*/bin/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-                fi
-              fi
+              curl -fLO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
+              tar -xzf postgresql-${DB_VERSION}.tar.gz
+              cd postgresql-${DB_VERSION}
+              ./configure --prefix=$GITHUB_WORKSPACE/pgsql
+              make -j$(nproc || sysctl -n hw.ncpu)
+              make install
+              cp $GITHUB_WORKSPACE/pgsql/bin/* ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               ;;
           esac
 
