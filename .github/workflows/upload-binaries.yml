@@ -168,12 +168,14 @@ jobs:
                 sudo apt-get install -y libreadline-dev
                 ./configure --prefix=$GITHUB_WORKSPACE/pgsql --disable-rpath
               else
+                export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
+                export PKG_CONFIG_PATH=""
                 ./configure \
                   --prefix=$GITHUB_WORKSPACE/pgsql \
                   --without-icu \
-                  --disable-rpath \
                   --disable-shared \
-                  --enable-static
+                  --enable-static \
+                  --disable-rpath
               fi
 
               make -j$(nproc || sysctl -n hw.ncpu)
