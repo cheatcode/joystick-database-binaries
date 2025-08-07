@@ -65,6 +65,12 @@ jobs:
           echo "DB_MAJOR_VERSION=source" >> $GITHUB_ENV
           echo "ARCH_CLEAN=$(echo '${{ matrix.arch }}' | sed 's/^_//')" >> $GITHUB_ENV
 
+      - name: Install Python 3.11 for MongoDB build
+        if: matrix.database == 'mongodb'
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
       - name: Install build dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -86,11 +92,9 @@ jobs:
             mongodb)
               git clone --branch r7.0.11 https://github.com/mongodb/mongo.git
               cd mongo
-
               python3 -m venv venv
               source venv/bin/activate
               pip install -r buildscripts/requirements.txt
-
               python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install
               cp /tmp/mongodb_install/bin/mongod $GITHUB_WORKSPACE/raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
 
@@ -105,14 +109,14 @@ jobs:
               ./configure --prefix=/tmp/pgsql
               make -j$(nproc)
               make install
-              cp /tmp/pgsql/bin/* ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
+              cp /tmp/pgsql/bin/* $GITHUB_WORKSPACE/raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
               ;;
             redis)
               curl -LO http://download.redis.io/releases/redis-7.2.4.tar.gz
               tar -xzf redis-7.2.4.tar.gz
               cd redis-7.2.4
               make -j$(nproc)
-              cp src/redis-server ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
+              cp src/redis-server $GITHUB_WORKSPACE/raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
               ;;
           esac
 
