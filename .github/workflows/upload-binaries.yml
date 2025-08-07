@@ -6,48 +6,73 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 30
     strategy:
       max-parallel: 3
       fail-fast: false
       matrix:
         include:
+          # MongoDB
           - database: mongodb
+            db_version: 8.0.12
             os: macos-latest
             platform: macos
             arch: arm64
+            ext: tar.gz
           - database: mongodb
+            db_version: 8.0.12
             os: macos-latest
             platform: macos
             arch: x86_64
+            ext: tar.gz
           - database: mongodb
+            db_version: 8.0.12
             os: ubuntu-latest
             platform: linux
             arch: x86_64
+            ext: tar.gz
+
+          # PostgreSQL
           - database: postgresql
+            db_version: 17.5
             os: macos-latest
             platform: macos
             arch: arm64
+            ext: tar.gz
           - database: postgresql
+            db_version: 17.5
             os: macos-latest
             platform: macos
             arch: x86_64
+            ext: tar.gz
           - database: postgresql
+            db_version: 17.5
             os: ubuntu-latest
             platform: linux
             arch: x86_64
+            ext: tar.gz
+
+          # Redis
           - database: redis
+            db_version: 7.2.5
             os: macos-latest
             platform: macos
             arch: arm64
+            ext: tar.gz
           - database: redis
+            db_version: 7.2.5
             os: macos-latest
             platform: macos
             arch: x86_64
+            ext: tar.gz
           - database: redis
+            db_version: 7.2.5
             os: ubuntu-latest
             platform: linux
             arch: x86_64
+            ext: tar.gz
+
+    environment: production
 
     env:
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -62,72 +87,80 @@ jobs:
       - name: Set environment variables
         shell: bash
         run: |
-          echo "DB_MAJOR_VERSION=source" >> $GITHUB_ENV
+          echo "DATABASE=${{ matrix.database }}" >> $GITHUB_ENV
+          echo "DB_VERSION=${{ matrix.db_version }}" >> $GITHUB_ENV
+          echo "DB_MAJOR_VERSION=$(echo '${{ matrix.db_version }}' | cut -d. -f1)" >> $GITHUB_ENV
           echo "ARCH_CLEAN=$(echo '${{ matrix.arch }}' | sed 's/^_//')" >> $GITHUB_ENV
 
-      - name: Install build dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential libssl-dev libreadline-dev zlib1g-dev curl git pkg-config python3 python3-pip
-
-      - name: Install build dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install openssl readline zlib cmake pkg-config python git curl
-
-      - name: Build and copy binaries
+      - name: Install dependencies and fetch binaries
         shell: bash
         run: |
-          mkdir -p ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}
+          mkdir -p ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}
           cd /tmp
 
-          case "${{ matrix.database }}" in
-            mongodb)
-              git clone https://github.com/mongodb/mongo.git
-              cd mongo
-              python3 -m pip install -r buildscripts/requirements.txt
-              python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install
-              cp /tmp/mongodb_install/bin/mongod ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
-
-              curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-${{ matrix.platform == 'macos' && (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') || 'linux-x64' }}.zip
-              unzip mongosh-2.5.6-*.zip -d mongosh
-              cp mongosh/bin/mongosh ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
-              ;;
-            postgresql)
-              curl -LO https://ftp.postgresql.org/pub/source/v17.0/postgresql-17.0.tar.gz
-              tar -xzf postgresql-17.0.tar.gz
-              cd postgresql-17.0
-              ./configure --prefix=/tmp/pgsql
-              make -j$(nproc)
-              make install
-              cp /tmp/pgsql/bin/* ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
-              ;;
+          case "$DATABASE" in
             redis)
-              curl -LO http://download.redis.io/releases/redis-7.2.4.tar.gz
-              tar -xzf redis-7.2.4.tar.gz
-              cd redis-7.2.4
-              make -j$(nproc)
-              cp src/redis-server ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
+              curl -LO https://download.redis.io/releases/redis-${DB_VERSION}.tar.gz
+              tar -xzf redis-${DB_VERSION}.tar.gz
+              cd redis-${DB_VERSION}
+              make
+              cp src/redis-server $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+              ;;
+
+            mongodb)
+              if [[ "$RUNNER_OS" == "macOS" ]]; then
+                curl -LO https://fastdl.mongodb.org/osx/mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
+                tar -xzf mongodb-macos-${ARCH_CLEAN}-${DB_VERSION}.tgz
+                cp ./mongodb-*/bin/* $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+
+                curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-darwin-${ARCH_CLEAN}.zip
+                unzip mongosh-2.5.6-darwin-${ARCH_CLEAN}.zip
+                cp mongosh-2.5.6-darwin-${ARCH_CLEAN}/bin/mongosh $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+              else
+                curl -LO https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
+                tar -xzf mongodb-linux-x86_64-ubuntu2204-${DB_VERSION}.tgz
+                cp ./mongodb-*/bin/* $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+
+                curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-linux-x64.tgz
+                tar -xzf mongosh-2.5.6-linux-x64.tgz
+                cp ./mongosh-2.5.6-linux-x64/bin/mongosh $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+              fi
+              ;;
+
+            postgresql)
+              curl -LO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
+              tar -xzf postgresql-${DB_VERSION}.tar.gz
+              cd postgresql-${DB_VERSION}
+              ./configure --prefix=/tmp/pgsql
+              make world -j2
+              make install-world
+              cp /tmp/pgsql/bin/* $GITHUB_WORKSPACE/raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
               ;;
           esac
 
-      - name: Archive binaries
+      - name: Archive binaries into platform-specific package
         shell: bash
         run: |
-          mkdir -p ./packages/${{ matrix.database }}/source/${{ matrix.platform }}
-          tar -czf ./packages/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}.tar.gz -C ./raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }} .
+          mkdir -p ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}
+          tar -czf ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}.tar.gz -C ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }} .
 
-      - name: Upload to R2
+      - name: Upload to R2 with aws-cli
         shell: bash
         run: |
+          set -euo pipefail
           pip install awscli --break-system-packages
+
+          if [[ -z "$R2_ENDPOINT" ]]; then
+            echo "R2_ENDPOINT is empty. Skipping upload."
+            exit 1
+          fi
+
           export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
           export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
           export AWS_DEFAULT_REGION="auto"
 
           aws s3 cp \
-            ./packages/${{ matrix.database }}/source/${{ matrix.platform }}/ \
-            s3://$R2_BUCKET/${{ matrix.database }}/source/${{ matrix.platform }}/ \
+            ./packages/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/ \
+            s3://$R2_BUCKET/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/ \
             --recursive \
             --endpoint-url "$R2_ENDPOINT"
