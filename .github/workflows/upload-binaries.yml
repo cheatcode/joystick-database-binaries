@@ -162,7 +162,15 @@ jobs:
               curl -fLO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
               tar -xzf postgresql-${DB_VERSION}.tar.gz
               cd postgresql-${DB_VERSION}
-              ./configure --prefix=$GITHUB_WORKSPACE/pgsql
+
+              if [[ "$RUNNER_OS" == "Linux" ]]; then
+                sudo apt-get update
+                sudo apt-get install -y libreadline-dev
+                ./configure --prefix=$GITHUB_WORKSPACE/pgsql
+              else
+                ./configure --prefix=$GITHUB_WORKSPACE/pgsql --without-icu
+              fi
+
               make -j$(nproc || sysctl -n hw.ncpu)
               make install
               cp $GITHUB_WORKSPACE/pgsql/bin/* ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
