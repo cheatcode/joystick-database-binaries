@@ -38,15 +38,15 @@ jobs:
             arch: arm64
             ext: tar.gz
 
-          # PostgreSQL
+          # PostgreSQL (now all use 17.6)
           - database: postgresql
-            db_version: 17
+            db_version: 17.6
             os: macos-latest
             platform: macos
             arch: arm64
             ext: tar.gz
           - database: postgresql
-            db_version: 17
+            db_version: 17.6
             os: macos-latest
             platform: macos
             arch: x86_64
@@ -159,7 +159,7 @@ jobs:
               ;;
             postgresql)
               if [[ "$RUNNER_OS" == "macOS" ]]; then
-                POSTGRES_APP_VERSION="2.6.8"
+                POSTGRES_APP_VERSION="2.8.2"
                 DMG_NAME="Postgres-${POSTGRES_APP_VERSION}-${DB_MAJOR_VERSION}.dmg"
                 curl -L -O "https://github.com/PostgresApp/PostgresApp/releases/download/v${POSTGRES_APP_VERSION}/${DMG_NAME}"
 
