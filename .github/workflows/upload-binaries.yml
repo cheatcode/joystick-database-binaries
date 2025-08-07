@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 120
     strategy:
       max-parallel: 3
       fail-fast: false
@@ -159,27 +159,109 @@ jobs:
               ;;
             postgresql)
               if [[ "$RUNNER_OS" == "macOS" ]]; then
-                POSTGRES_APP_VERSION="2.8.2"
-                DMG_NAME="Postgres-${POSTGRES_APP_VERSION}-${DB_MAJOR_VERSION}.dmg"
-                curl -L -O "https://github.com/PostgresApp/PostgresApp/releases/download/v${POSTGRES_APP_VERSION}/${DMG_NAME}"
+                # Install Homebrew if missing (for coreutils)
+                if ! command -v brew &> /dev/null; then
+                  echo "Installing Homebrew..."
+                  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                  eval "$(/opt/homebrew/bin/brew shellenv)"
+                fi
+                
+                # Install required tools
+                brew install coreutils
 
-                MOUNT_OUTPUT=$(hdiutil attach "${DMG_NAME}" -nobrowse -quiet)
-                MOUNT_DIR=$(echo "$MOUNT_OUTPUT" | grep "/Volumes/" | awk '{print $NF}' | head -n1)
+                # Download and extract PostgreSQL source
+                TARBALL="postgresql-${DB_VERSION}.tar.gz"
+                TARBALL_URL="https://ftp.postgresql.org/pub/source/v${DB_VERSION}/${TARBALL}"
+                curl -fLO "$TARBALL_URL"
+                tar -xzf "$TARBALL"
+                cd "postgresql-${DB_VERSION}"
 
-                APP_PATH=$(find "$MOUNT_DIR" -name "Postgres.app" -type d | head -n 1)
-                BIN_DIR="${APP_PATH}/Contents/Versions/${DB_MAJOR_VERSION}/bin"
-                LIB_DIR="${APP_PATH}/Contents/Versions/${DB_MAJOR_VERSION}/lib"
+                # Clean previous builds
+                make clean || true
 
-                if [[ ! -d "$BIN_DIR" ]]; then
-                  echo "ERROR: Could not find expected PostgreSQL bin directory at $BIN_DIR"
-                  ls -R "$MOUNT_DIR" || true
-                  exit 1
+                # Set up architecture-specific build flags
+                SDK_PATH=$(xcrun --show-sdk-path)
+                if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+                  MIN_MACOS="11.0"
+                else
+                  MIN_MACOS="10.15"
                 fi
 
-                cp -R "$BIN_DIR"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
-                cp -R "$LIB_DIR"/* ./raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/ || true
+                # Configure with portable rpath
+                LDFLAGS="-arch ${{ matrix.arch }} -isysroot $SDK_PATH -mmacosx-version-min=$MIN_MACOS" \
+                CFLAGS="-arch ${{ matrix.arch }} -isysroot $SDK_PATH -mmacosx-version-min=$MIN_MACOS" \
+                ./configure \
+                  --prefix="$GITHUB_WORKSPACE/pgsql" \
+                  --enable-rpath \
+                  --without-readline \
+                  --without-zlib \
+                  --without-openssl \
+                  --without-icu
 
-                hdiutil detach "$MOUNT_DIR" -quiet
+                # Build and install
+                make -j$(sysctl -n hw.ncpu)
+                make install
+
+                # Create lib directory in output
+                mkdir -p ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/lib
+
+                # Copy binaries and libraries
+                cp -R "$GITHUB_WORKSPACE/pgsql/bin"/* ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/
+                cp -R "$GITHUB_WORKSPACE/pgsql/lib"/*.dylib ../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/lib/ 2>/dev/null || true
+
+                # Fix library paths for portability
+                BIN_DIR="../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}"
+                LIB_DIR="../raw/${DATABASE}/${DB_MAJOR_VERSION}/${{ matrix.platform }}/${{ matrix.arch }}/lib"
+
+                # Fix rpath in binaries to use relative paths
+                for binary in "$BIN_DIR"/*; do
+                  if [[ -f "$binary" && -x "$binary" && ! -d "$binary" ]]; then
+                    echo "Fixing paths for $(basename "$binary")"
+                    
+                    # Get current library dependencies
+                    otool -L "$binary" | grep "$GITHUB_WORKSPACE/pgsql" | while read -r line; do
+                      old_path=$(echo "$line" | awk '{print $1}')
+                      lib_name=$(basename "$old_path")
+                      
+                      # Change absolute path to relative path
+                      install_name_tool -change "$old_path" "@loader_path/lib/$lib_name" "$binary" 2>/dev/null || true
+                    done
+                    
+                    # Set rpath for the binary
+                    install_name_tool -add_rpath "@loader_path/lib" "$binary" 2>/dev/null || true
+                  fi
+                done
+
+                # Fix library paths in shared libraries themselves
+                for lib in "$LIB_DIR"/*.dylib; do
+                  if [[ -f "$lib" ]]; then
+                    echo "Fixing paths for $(basename "$lib")"
+                    lib_name=$(basename "$lib")
+                    
+                    # Fix the library's own install name
+                    install_name_tool -id "@rpath/$lib_name" "$lib" 2>/dev/null || true
+                    
+                    # Fix dependencies within the library
+                    otool -L "$lib" | grep "$GITHUB_WORKSPACE/pgsql" | while read -r line; do
+                      old_path=$(echo "$line" | awk '{print $1}')
+                      dep_name=$(basename "$old_path")
+                      
+                      if [[ "$dep_name" != "$lib_name" ]]; then
+                        install_name_tool -change "$old_path" "@loader_path/$dep_name" "$lib" 2>/dev/null || true
+                      fi
+                    done
+                  fi
+                done
+
+                echo "Verifying portable paths..."
+                for binary in "$BIN_DIR"/*; do
+                  if [[ -f "$binary" && -x "$binary" && ! -d "$binary" ]]; then
+                    echo "  $(basename "$binary"):"
+                    otool -L "$binary" | grep -E "(loader_path|rpath)" || echo "    No relative paths found"
+                  fi
+                done
+
+                cd ..
               else
                 curl -LO https://ftp.postgresql.org/pub/source/v${DB_VERSION}/postgresql-${DB_VERSION}.tar.gz
                 tar -xzf postgresql-${DB_VERSION}.tar.gz
