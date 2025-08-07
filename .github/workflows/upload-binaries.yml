@@ -75,7 +75,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt update
-          sudo apt install -y build-essential libssl-dev libreadline-dev zlib1g-dev curl git pkg-config python3 python3-pip binutils-gold
+          sudo apt install -y build-essential libssl-dev libreadline-dev zlib1g-dev curl git pkg-config python3 python3-pip
 
       - name: Install build dependencies (macOS)
         if: runner.os == 'macOS'
@@ -102,14 +102,8 @@ jobs:
               python3 -m venv venv
               source venv/bin/activate
               pip install -r buildscripts/requirements.txt
-              pip install 'jsonschema<4.20.0' 'referencing<0.31.0' networkx cxxfilt
-
-              if [[ "${{ matrix.platform }}" == "linux" ]]; then
-                python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install --linker=gold
-              else
-                python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install
-              fi
-
+              pip install 'jsonschema<4.20.0' 'referencing<0.31.0' networkx
+              python3 buildscripts/scons.py install-mongod --prefix=/tmp/mongodb_install
               cp /tmp/mongodb_install/bin/mongod $GITHUB_WORKSPACE/raw/${{ matrix.database }}/source/${{ matrix.platform }}/${{ matrix.arch }}/
 
               curl -LO https://downloads.mongodb.com/compass/mongosh-2.5.6-${{ matrix.platform == 'macos' && (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') || 'linux-x64' }}.zip
