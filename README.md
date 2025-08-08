@@ -1,4 +1,4 @@
-# Database Binaries Build System
+# Joystick Database Binaries
 
 This project provides automated build systems for creating portable database binaries for macOS and Linux across multiple architectures (x86_64 and arm64). The binaries are built with portable configurations and uploaded to Cloudflare R2 storage for distribution.
 
