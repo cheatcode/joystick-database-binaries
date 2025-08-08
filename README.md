@@ -16,9 +16,9 @@ This project provides automated build systems for creating portable database bin
 │   └── upload-binaries.yml          # GitHub Actions workflow for MongoDB/Redis
 ├── manual/
 │   └── postgresql/
-│       ├── build                    # macOS build script
-│       ├── build-linux              # Linux build script
-│       └── config.json              # R2 credentials (not in repo)
+│       ├── build_macos              # macOS build script
+│       └── build_linux              # Linux build script
+├── config.json                      # R2 credentials (not in repo)
 └── README.md
 ```
 
@@ -26,7 +26,7 @@ This project provides automated build systems for creating portable database bin
 
 ### Required Configuration File
 
-Create a `config.json` file in either the project root or `manual/postgresql/` directory:
+Create a `config.json` file in the project root directory:
 
 ```json
 {
@@ -41,7 +41,7 @@ Create a `config.json` file in either the project root or `manual/postgresql/` d
 
 PostgreSQL builds are handled manually due to the complexity of creating truly portable binaries with proper library linking.
 
-### macOS Build (`manual/postgresql/build`)
+### macOS Build (`manual/postgresql/build_macos`)
 
 **Features:**
 - Cross-compilation support for both arm64 and x86_64
@@ -53,8 +53,8 @@ PostgreSQL builds are handled manually due to the complexity of creating truly p
 **Usage:**
 ```bash
 cd manual/postgresql
-./build arm64     # Build for Apple Silicon
-./build x86_64    # Build for Intel Macs
+./build_macos arm64     # Build for Apple Silicon
+./build_macos x86_64    # Build for Intel Macs
 ```
 
 **Build Process:**
@@ -65,7 +65,7 @@ cd manual/postgresql
 5. Verifies portable rpath configuration
 6. Creates tarball and uploads to R2
 
-### Linux Build (`manual/postgresql/build-linux`)
+### Linux Build (`manual/postgresql/build_linux`)
 
 **Features:**
 - Cross-compilation support for arm64 and x86_64
@@ -77,8 +77,8 @@ cd manual/postgresql
 **Usage:**
 ```bash
 cd manual/postgresql
-./build-linux arm64     # Build for ARM64 Linux
-./build-linux x86_64    # Build for x86_64 Linux
+./build_linux arm64     # Build for ARM64 Linux
+./build_linux x86_64    # Build for x86_64 Linux
 ```
 
 **Build Process:**
@@ -122,10 +122,10 @@ The workflow builds for:
 3. Run the build scripts on target machines:
    ```bash
    cd manual/postgresql
-   ./build arm64
-   ./build x86_64
-   ./build-linux arm64
-   ./build-linux x86_64
+   ./build_macos arm64
+   ./build_macos x86_64
+   ./build_linux arm64
+   ./build_linux x86_64
    ```
 
 ### MongoDB/Redis

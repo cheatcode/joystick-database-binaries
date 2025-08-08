@@ -1,4 +1,4 @@
 *.p12
 *.txt
 manual/postgresql/tmp
-manual/postgresql/config.json
+config.json
