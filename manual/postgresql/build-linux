@@ -30,7 +30,7 @@ fi
 # Install required packages
 echo "Installing required packages..."
 sudo apt-get update
-sudo apt-get install -y build-essential zlib1g-dev libreadline-dev libssl-dev libicu-dev pkg-config curl jq python3-pip
+sudo apt-get install -y build-essential zlib1g-dev libreadline-dev libssl-dev libicu-dev pkg-config curl jq python3-pip bison flex
 
 # Install AWS CLI via pip
 echo "Installing AWS CLI..."
@@ -107,24 +107,8 @@ make -j$(nproc)
 echo "Installing to temp directory..."
 make install
 
-echo "Creating portable static binaries..."
-# Copy binaries to a clean directory structure
-FINAL_BIN_DIR="$TMP_DIR/bin"
-FINAL_LIB_DIR="$TMP_DIR/lib"
-
-# Ensure directories exist
-mkdir -p "$FINAL_BIN_DIR" "$FINAL_LIB_DIR"
-
-# Copy all binaries
-cp -R "$TMP_DIR/bin"/* "$FINAL_BIN_DIR/"
-
-# Copy any shared libraries that might be needed (though we're building static)
-if [[ -d "$TMP_DIR/lib" ]]; then
-  cp -R "$TMP_DIR/lib"/* "$FINAL_LIB_DIR/" 2>/dev/null || true
-fi
-
 echo "Stripping binaries to reduce size..."
-for binary in "$FINAL_BIN_DIR"/*; do
+for binary in "$TMP_DIR/bin"/*; do
   if [[ -f "$binary" && -x "$binary" ]]; then
     echo "Stripping $(basename "$binary")"
     ${CROSS_COMPILE}strip "$binary" 2>/dev/null || strip "$binary" 2>/dev/null || true
@@ -132,7 +116,7 @@ for binary in "$FINAL_BIN_DIR"/*; do
 done
 
 echo "Verifying binary architecture and dependencies..."
-for binary in "$FINAL_BIN_DIR"/*; do
+for binary in "$TMP_DIR/bin"/*; do
   if [[ -f "$binary" && -x "$binary" ]]; then
     echo "  $(basename "$binary"):"
     file "$binary" | grep -E "(ELF|executable)" || echo "    Not an ELF binary"
