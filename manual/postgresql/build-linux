@@ -30,7 +30,7 @@ fi
 # Install required packages
 echo "Installing required packages..."
 sudo apt-get update
-sudo apt-get install -y build-essential zlib1g-dev libreadline-dev libssl-dev libicu-dev pkg-config curl jq python3-pip bison flex
+sudo apt-get install -y build-essential zlib1g-dev libreadline-dev libssl-dev libicu-dev pkg-config curl jq python3-pip bison flex patchelf chrpath
 
 # Install AWS CLI via pip
 echo "Installing AWS CLI..."
@@ -87,25 +87,51 @@ if [[ -n "$CROSS_COMPILE" ]]; then
   export RANLIB="${CROSS_COMPILE}ranlib"
 fi
 
-# Configure with static linking and portable settings
-CFLAGS="-static-libgcc -fPIC" \
-LDFLAGS="-static-libgcc" \
+# Configure with shared libraries but portable settings
+# We need shared libraries for libpq, but we'll bundle them
+CFLAGS="-fPIC" \
+LDFLAGS="-Wl,-rpath,'\$ORIGIN/../lib'" \
 ./configure \
   $HOST_FLAG \
   --prefix="$TMP_DIR" \
+  --enable-shared \
   --enable-static \
-  --disable-shared \
   --without-readline \
   --without-zlib \
   --without-openssl \
-  --without-icu \
-  --disable-rpath
+  --without-icu
 
 echo "Building..."
 make -j$(nproc)
 
 echo "Installing to temp directory..."
 make install
+
+echo "Creating lib directory and copying shared libraries..."
+mkdir -p "$TMP_DIR/lib"
+
+# Copy PostgreSQL shared libraries
+if [[ -d "$TMP_DIR/lib" ]]; then
+  # Copy libpq and other PostgreSQL libraries
+  find "$TMP_DIR/lib" -name "*.so*" -type f -exec cp {} "$TMP_DIR/lib/" \; 2>/dev/null || true
+fi
+
+# Also check for libraries in the build directory
+find . -name "libpq.so*" -type f -exec cp {} "$TMP_DIR/lib/" \; 2>/dev/null || true
+find . -name "*.so*" -type f -path "*/src/interfaces/libpq/*" -exec cp {} "$TMP_DIR/lib/" \; 2>/dev/null || true
+
+echo "Setting RPATH for binaries..."
+for binary in "$TMP_DIR/bin"/*; do
+  if [[ -f "$binary" && -x "$binary" ]]; then
+    echo "Setting RPATH for $(basename "$binary")"
+    # Set RPATH to look for libraries in ../lib relative to binary location
+    if command -v patchelf &> /dev/null; then
+      patchelf --set-rpath '$ORIGIN/../lib' "$binary" 2>/dev/null || true
+    elif command -v chrpath &> /dev/null; then
+      chrpath -r '$ORIGIN/../lib' "$binary" 2>/dev/null || true
+    fi
+  fi
+done
 
 echo "Stripping binaries to reduce size..."
 for binary in "$TMP_DIR/bin"/*; do
@@ -115,19 +141,36 @@ for binary in "$TMP_DIR/bin"/*; do
   fi
 done
 
+# Strip shared libraries too
+for lib in "$TMP_DIR/lib"/*.so*; do
+  if [[ -f "$lib" ]]; then
+    echo "Stripping $(basename "$lib")"
+    ${CROSS_COMPILE}strip "$lib" 2>/dev/null || strip "$lib" 2>/dev/null || true
+  fi
+done
+
 echo "Verifying binary architecture and dependencies..."
 for binary in "$TMP_DIR/bin"/*; do
   if [[ -f "$binary" && -x "$binary" ]]; then
     echo "  $(basename "$binary"):"
     file "$binary" | grep -E "(ELF|executable)" || echo "    Not an ELF binary"
     
-    # Check for dynamic dependencies (should be minimal for static builds)
+    # Check for dynamic dependencies
     if command -v ldd &> /dev/null; then
       echo "    Dependencies:"
-      ldd "$binary" 2>/dev/null | head -5 || echo "    Static binary (no dependencies)"
+      ldd "$binary" 2>/dev/null | head -10 || echo "    Could not determine dependencies"
+    fi
+    
+    # Check RPATH
+    if command -v readelf &> /dev/null; then
+      echo "    RPATH:"
+      readelf -d "$binary" 2>/dev/null | grep -E "(RPATH|RUNPATH)" || echo "    No RPATH set"
     fi
   fi
 done
+
+echo "Listing shared libraries in lib directory..."
+ls -la "$TMP_DIR/lib/" 2>/dev/null || echo "No lib directory found"
 
 echo "Packing binaries..."
 mkdir -p "$SRC_DIR/$VERSION"
