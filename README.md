@@ -26,7 +26,7 @@ This project provides automated build systems for creating portable database bin
 
 ### Required Configuration File
 
-Create a `config.json` file in the project root directory:
+Only required for manual builds. You can create a `config.json` file in the project root directory:
 
 ```json
 {
@@ -93,6 +93,52 @@ cd manual/postgresql
 ## Automated Builds (GitHub Actions)
 
 MongoDB and Redis builds are automated through GitHub Actions workflow.
+
+### GitHub Actions Secrets Configuration
+
+The workflow requires the following secrets to be configured in your GitHub repository:
+
+**Required Secrets:**
+- `R2_ACCESS_KEY_ID` - Your Cloudflare R2 access key ID
+- `R2_SECRET_ACCESS_KEY` - Your Cloudflare R2 secret access key
+- `R2_BUCKET` - Your R2 bucket name
+- `R2_ENDPOINT` - Your R2 endpoint URL (format: `https://your-account-id.r2.cloudflarestorage.com`)
+
+**How to Set GitHub Secrets:**
+
+1. Navigate to your GitHub repository
+2. Go to **Settings** → **Secrets and variables** → **Actions**
+3. Click **New repository secret**
+4. Add each of the required secrets listed above
+5. The workflow uses the `production` environment, so ensure secrets are available to that environment.
+
+**GitHub Environments Setup**
+
+The workflow uses the `production` environment. To create and configure environments:
+
+**Creating a New Environment:**
+1. Go to **Settings** → **Environments**
+2. Click **New environment**
+3. Enter environment name (e.g., `production`, `staging`, `development`)
+4. Click **Configure environment**
+
+**Adding Secrets to an Environment:**
+1. In the environment configuration page
+2. Scroll to **Environment secrets**
+3. Click **Add secret**
+4. Add each of the required R2 secrets listed above
+
+**Using Different Environments:**
+To use a different environment, modify the workflow file:
+```yaml
+environment: staging  # Change from 'production' to your environment name
+```
+
+**Environment Benefits:**
+- Separate credentials for different deployment targets
+- Additional security controls and approval processes
+- Environment-specific configuration and protection rules
+- Better organization for multi-stage deployments
 
 ### Triggering Builds
 
